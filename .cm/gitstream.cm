@@ -4,7 +4,7 @@ manifest:
 
 automations:
   performance_ai_review:
-    # code-review runs on PR creation, new commits, and ready-for-review events.
+    # Runs for PR creation and new commits; skips drafts and bot-authored PRs.
     if:
       - {{ not pr.draft }}
       - {{ not (is.bot_author or is.bot_branch) }}
