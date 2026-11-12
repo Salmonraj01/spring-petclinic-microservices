@@ -21,10 +21,11 @@ jobs:
 
     # Pilot restriction: same-repository PRs only.
     # Skip draft PRs and fork PRs.
+    # if: >-
+    #   github.event.pull_request.head.repo.full_name == github.repository &&
+    #   github.event.pull_request.draft == false
     if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.draft == false
-
+      github.event.pull_request.head.repo.full_name == github.repository 
     steps:
       # Checkout trusted base branch.
       - name: Checkout trusted base branch
