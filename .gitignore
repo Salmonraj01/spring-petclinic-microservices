@@ -21,3 +21,8 @@ target/
 generated/
 
 **/.DS_Store
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example

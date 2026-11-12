@@ -1,0 +1,170 @@
+
+name: Bedrock AI Performance Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  performance-review:
+    name: Claude Haiku Performance Review
+    runs-on: ubuntu-latest
+
+    # Pilot restriction: same-repository PRs only.
+    # Skip draft PRs and fork PRs.
+    # if: >-
+    #   github.event.pull_request.head.repo.full_name == github.repository &&
+    #   github.event.pull_request.draft == false
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository 
+    steps:
+      # Checkout trusted base branch.
+      - name: Checkout trusted base branch
+        uses: actions/checkout@v4
+        with:
+          # ref: ${{ github.event.pull_request.base.sha }}
+          ref : feature/bedrock-performance-review
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install reviewer dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r scripts/bedrock-review-requirements.txt
+
+      # Fetch PR source as a diff, not as executable code.
+      - name: Fetch PR changes
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch origin \
+            "refs/pull/${PR_NUMBER}/head:refs/remotes/pull/${PR_NUMBER}/head"
+
+          git diff --no-ext-diff --unified=8 \
+            "${BASE_SHA}...refs/remotes/pull/${PR_NUMBER}/head" \
+            -- '*.java' '*.cs' > pr.patch
+
+      # Run the trusted reviewer against the PR diff.
+      - name: Run Bedrock performance reviewer
+        id: review
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_REGION: us-east-1
+        run: |
+          if [ ! -s pr.patch ]; then
+            echo "No Java or C# changes found."
+
+            printf '{"model":"us.anthropic.claude-haiku-4-5-20251001-v1:0","region":"us-east-1","files_reviewed":[],"findings":[],"finding_count":0}\n' > bedrock-review.json
+
+            echo "review_exit_code=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+
+          python scripts/bedrock_performance_review.py \
+            --diff-file pr.patch \
+            --region "$AWS_REGION" \
+            --output bedrock-review.json
+
+          REVIEW_EXIT_CODE=$?
+
+          set -e
+
+          echo "review_exit_code=$REVIEW_EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+          if [ "$REVIEW_EXIT_CODE" -gt 1 ]; then
+            exit "$REVIEW_EXIT_CODE"
+          fi
+
+          if [ ! -f bedrock-review.json ]; then
+            printf '{"model":"us.anthropic.claude-haiku-4-5-20251001-v1:0","region":"%s","files_reviewed":[],"findings":[],"finding_count":0}\n' "$AWS_REGION" > bedrock-review.json
+          fi
+
+      # Publish or update a single summary comment.
+      - name: Publish performance findings on PR
+        if: steps.review.outputs.review_exit_code == '0' || steps.review.outputs.review_exit_code == '1'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const marker = '<!-- bedrock-performance-review -->';
+
+            const result = JSON.parse(
+              fs.readFileSync('bedrock-review.json', 'utf8')
+            );
+
+            const prNumber = context.issue.number;
+            const findings = result.findings || [];
+
+            let body = `${marker}\n`;
+            body += `## AWS Bedrock Performance Review\n\n`;
+            body += `**Model:** Claude Haiku 4.5  \n`;
+            body += `**Region:** ${result.region}  \n`;
+            body += `**Files reviewed:** ${result.files_reviewed.length}  \n`;
+            body += `**Findings:** ${findings.length}\n\n`;
+
+            if (result.files_reviewed.length === 0) {
+              body += 'No eligible Java or C# source changes were found.\n';
+            } else if (findings.length === 0) {
+              body += 'No performance issues were identified under the configured review rules.\n';
+            } else {
+              for (const finding of findings) {
+                body += `### ${finding.severity} — ${finding.rule_id}: ${finding.title}\n\n`;
+                body += `**File:** \`${finding.file}\`  \n`;
+                body += `**Line:** ${finding.line}\n\n`;
+                body += `${finding.body}\n\n`;
+                body += '---\n\n';
+              }
+            }
+
+            body += '\n_Generated using the repository performance rules and AWS Bedrock._';
+
+            const { owner, repo } = context.repo;
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner,
+                repo,
+                issue_number: prNumber,
+                per_page: 100
+              }
+            );
+
+            const existing = comments.find(comment =>
+              comment.body && comment.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body
+              });
+            }
