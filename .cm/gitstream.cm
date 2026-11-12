@@ -1,0 +1,12 @@
+# -*- mode: yaml -*-
+manifest:
+  version: 1.0
+
+automations:
+  gitstream_setup_check:
+    on: [pr_created, commit]
+    run:
+      - action: add-label@v1
+        args:
+          label: "gitstream-enabled"
+          color: '0e8a16'
