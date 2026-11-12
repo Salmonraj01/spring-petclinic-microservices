@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local-first Java/.NET performance reviewer powered by AWS Bedrock Claude 3 Haiku.
+"""Local-first Java/.NET performance reviewer powered by AWS Bedrock Claude Haiku 4.5.
 
 Credentials are read from the standard AWS environment/profile chain. This tool
 never reads credentials from source files or prints them.
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import boto3
 
-MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 ROOT = Path(__file__).resolve().parents[1]
 RULES_DIR = ROOT / "performance-review-rules"
 MAX_FINDINGS = 5
@@ -114,8 +114,8 @@ def call_claude(prompt, region):
 def parse_model_json(text):
     cleaned = text.strip()
     if cleaned.startswith("```"):
-        cleaned = re.sub(r"^\```(?:json)?\s*", "", cleaned)
-        cleaned = re.sub(r"\s*\```$", "", cleaned)
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
     start, end = cleaned.find("{"), cleaned.rfind("}")
     if start < 0 or end < start:
         raise ValueError("Claude response did not contain a JSON object")
@@ -123,7 +123,7 @@ def parse_model_json(text):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Review local Java/.NET changes with AWS Bedrock Claude.")
+    parser = argparse.ArgumentParser(description="Review local Java/.NET changes with AWS Bedrock Claude Haiku 4.5.")
     parser.add_argument("--base-ref", help="Git ref to compare against, e.g. origin/main. Default: HEAD (working tree changes).")
     parser.add_argument("--diff-file", help="Path to a unified diff file instead of running git diff.")
     parser.add_argument("--region", default=os.getenv("AWS_REGION", "us-east-1"))
