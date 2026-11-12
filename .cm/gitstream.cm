@@ -3,10 +3,19 @@ manifest:
   version: 1.0
 
 automations:
-  gitstream_setup_check:
-    on: [pr_created, commit]
+  performance_ai_review:
+    # Review new PRs, PRs made ready for review, and new commits.
+    on: [pr_created, pr_ready_for_review, commit]
+    if:
+      - {{ not pr.draft }}
+      - {{ not (is.bot_author or is.bot_branch) }}
     run:
-      - action: add-label@v1
+      - action: code-review@v1
         args:
-          label: "gitstream-enabled"
-          color: '0e8a16'
+          approve_on_LGTM: false
+          issues_limit: 5
+          guidelines: {{ "./performance-review-rules/COMBINED_PERF_RULES.md" | readFile() | dump }}
+
+is:
+  bot_author: {{ pr.author | match(list=['github-actions', '_bot_', '[bot]', 'dependabot']) | some }}
+  bot_branch: {{ branch.name | match(list=['renovate/']) | some }}
