@@ -6,9 +6,6 @@ modifying their contents.
 
 ## 1. Configure AWS credentials locally
 
-Copy `.env.example` to `.env` and fill in your temporary AWS credentials.
-Never commit `.env`. The repository ignores it.
-
 PowerShell (current terminal only):
 
 ```powershell
@@ -20,6 +17,8 @@ $env:AWS_REGION = "us-east-1"
 
 Do not paste credentials into source code, command history, or chat. Temporary
 session credentials expire; replace them when AWS reports an expired token.
+The reviewer uses boto3's standard AWS environment/profile credential chain.
+A local `.env` file is not loaded automatically.
 
 ## 2. Install dependencies
 
@@ -59,8 +58,8 @@ python scripts/bedrock_performance_review.py --diff-file review.patch
 ## 4. AWS requirements
 
 The active AWS identity needs permission for `bedrock:InvokeModel` on
-`anthropic.claude-3-haiku-20240307-v1:0` in `us-east-1`, and model access must
-be enabled in that account/region.
+`us.anthropic.claude-haiku-4-5-20251001-v1:0` in `us-east-1`, and access
+to the Claude Haiku 4.5 inference profile must be enabled in that account/region.
 
 ## Scope
 
