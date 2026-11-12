@@ -46,9 +46,7 @@ def load_rules(files):
 
     cm_text = cm_path.read_text(encoding="utf-8")
     # Keep the gitStream policy's configured finding limit where present.
-    limit_match = re.search(r"issues_limit:\\s*(\\d+)", cm_text)
-    limit = min(MAX_FINDINGS, int(limit_match.group(1))) if limit_match else MAX_FINDINGS
-
+    limit_value = next((line.split(":", 1)[1].strip() for line in cm_text.splitlines() if line.strip().startswith("issues_limit:")), "5")\n    limit = min(MAX_FINDINGS, int(limit_value))\n
     combined = combined_path.read_text(encoding="utf-8")
     java = (ROOT / "performance-review-rules" / "JAVA_PERF_RULES.md").read_text(encoding="utf-8")
     dotnet = (ROOT / "performance-review-rules" / "DOTNET_PERF_RULES.md").read_text(encoding="utf-8")
