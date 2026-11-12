@@ -85,7 +85,7 @@ def extract_json(text):
 def main():
     event_path = os.environ["GITHUB_EVENT_PATH"]
     event = json.loads(Path(event_path).read_text(encoding="utf-8"))
-    pr = event["pull_request"]
+    if "pull_request" not in event:\n        raise RuntimeError("This reviewer must be run from a pull_request event.")\n    pr = event["pull_request"]
     owner_repo = os.environ["GITHUB_REPOSITORY"]
     pr_number = pr["number"]
 
